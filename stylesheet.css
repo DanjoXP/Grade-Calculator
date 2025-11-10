@@ -190,3 +190,26 @@ button.secondary {
     margin: 0;
     padding: 0
 }
+
+.card-content {
+    overflow: hidden;
+    transition: max-height 0.3s ease, opacity 0.3s ease;
+}
+
+.card-content.collapsed {
+    max-height: 0 !important;
+    opacity: 0;
+    margin: 0;
+    padding: 0;
+}
+
+.toggle-icon {
+    font-size: 20px;
+    transition: transform 0.3s ease;
+    color: #4aaa8c;
+    display: inline-block
+}
+
+.toggle-icon.collapsed {
+    transform: rotate(180deg);
+}
