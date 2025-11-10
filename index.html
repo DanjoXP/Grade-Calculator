@@ -65,8 +65,18 @@
             <input type="number" id="boundaryFail" min="0" max="100" value="30" step="1">
           </div>
         </div>
-        <button id="resetBoundariesBtn" type="button" class="secondary" style="margin-top:10px;">Reset to Defaults</button>
+        <button id="resetBoundariesBtn" type="button" class="secondary" style="margin-top:10px;">Reset to
+          Defaults</button>
       </div>
+      <div style="margin-top:15px;">
+        <label><strong>Rounding Mode</strong></label>
+        <div class="rounding-options">
+          <label><input type="radio" name="roundingMode" value="normal" checked>Standard</label>
+          <label><input type="radio" name="roundingMode" value="up">Always Round Up</label>
+          <label><input type="radio" name="roundingMode" value="down">Always Round Down</label>
+        </div>
+      </div>
+
     </div>
 
     <!-- Assessments -->
@@ -76,7 +86,8 @@
         <span class="toggle-icon">&#9650;</span>
       </div>
       <div class="card-content">
-        <p class="lead">Enter completed marks and weightings. Leave score empty for incomplete assessments. Total weight must equal 100%.</p>
+        <p class="lead">Enter completed marks and weightings. Leave score empty for incomplete assessments. Total weight
+          must equal 100%.</p>
         <table id="marksTable">
           <thead>
             <tr>
@@ -108,9 +119,9 @@
       </div>
     </div>
 
-  <div id="celebration" class="celebration hidden">
-  
-</div>
+    <div id="celebration" class="celebration hidden">
+
+    </div>
 
 </body>
 
