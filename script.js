@@ -216,6 +216,7 @@ document.addEventListener('DOMContentLoaded', function () {
         calculateTargetBtn.disabled = hasErrors;
 
         toggleAddButton();
+        toggleCalculateButton();
     }
 
     function gradeFromScore(score) {
@@ -368,6 +369,17 @@ document.addEventListener('DOMContentLoaded', function () {
         addRowBtn.disabled = totalWeight >= 100;
     }
 
+    function toggleCalculateButton() {
+    const totalWeight = Array.from(marksBody.querySelectorAll('tr')).reduce((sum, row) => {
+        const weightVal = parseFloat(row.children[3].querySelector('input').value) || 0;
+        return sum + weightVal;
+    }, 0);
+
+    // Enable only if total weight is exactly 100
+    calculateTargetBtn.disabled = Math.abs(totalWeight - 100) > 0.01;
+}
+
+
     function clear() {
         marksBody.innerHTML = '';
         totalWeightCell.textContent = '-';
@@ -394,6 +406,23 @@ document.addEventListener('DOMContentLoaded', function () {
     calculateTargetBtn.addEventListener('click', updateTargetPrediction);
     addRowBtn.addEventListener('click', () => addRow());
     clearBtn.addEventListener('click', clear);
+
+    // Collapsible card functionality
+    document.querySelectorAll('.card').forEach(card => {
+    const header = card.querySelector('.card-header');
+    const content = card.querySelector('.card-content');
+    const icon = card.querySelector('.toggle-icon');
+
+    // Start expanded by default
+    content.classList.remove('collapsed');
+    icon.classList.remove('collapsed');
+
+    header.addEventListener('click', () => {
+        content.classList.toggle('collapsed');
+        icon.classList.toggle('collapsed');
+    });
+});
+
 
     // Initialize with one empty row
     addRow();

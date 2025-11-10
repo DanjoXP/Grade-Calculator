@@ -11,89 +11,104 @@
 
 <body>
   <div class="wrap">
+
+    <!-- Target Prediction -->
     <div class="card">
-      <h2>Target Prediction</h2>
-      <p class="lead">Select your target final grade to see what's needed in incomplete assessments.</p>
-      <div style="display:grid;grid-template-columns:repeat(1,1fr);gap:12px;">
-        <div>
-          <label for="target">Target Grade</label>
-          <select id="target">
-            <option value="70">1st</option>
-            <option value="60">2.1</option>
-            <option value="50">2.2</option>
-            <option value="40">3rd</option>
-          </select>
-        </div>
+      <div class="card-header">
+        <h2>Target Prediction</h2>
+        <span class="toggle-icon">&#9650;</span>
       </div>
-      <div id="targetOutput" class="result" style="display:none;"></div>
+      <div class="card-content">
+        <p class="lead">Select your target final grade to see what's needed in incomplete assessments.</p>
+        <div style="display:grid;grid-template-columns:repeat(1,1fr);gap:12px;">
+          <div>
+            <label for="target">Target Grade</label>
+            <select id="target">
+              <option value="70">1st</option>
+              <option value="60">2.1</option>
+              <option value="50">2.2</option>
+              <option value="40">3rd</option>
+            </select>
+          </div>
+        </div>
+        <div id="targetOutput" class="result" style="display:none;"></div>
+      </div>
     </div>
 
+    <!-- Grade Boundaries -->
     <div class="card">
-      <h2>Grade Boundaries</h2>
-      <p class="lead">Customize the percentage thresholds for each grade classification.</p>
-      <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
-        <div>
-          <label for="boundary1st">1st Class (%)</label>
-          <input type="number" id="boundary1st" min="0" max="100" value="70" step="1">
-        </div>
-        <div>
-          <label for="boundary21">2.1 Upper Class (%)</label>
-          <input type="number" id="boundary21" min="0" max="100" value="60" step="1">
-        </div>
-        <div>
-          <label for="boundary22">2.2 Lower Class (%)</label>
-          <input type="number" id="boundary22" min="0" max="100" value="50" step="1">
-        </div>
-        <div>
-          <label for="boundary3rd">3rd Class (%)</label>
-          <input type="number" id="boundary3rd" min="0" max="100" value="40" step="1">
-        </div>
-        <div>
-          <label for="boundaryFail">Marginal Fail (%)</label>
-          <input type="number" id="boundaryFail" min="0" max="100" value="30" step="1">
-        </div>
+      <div class="card-header">
+        <h2>Grade Boundaries</h2>
+        <span class="toggle-icon">&#9650;</span>
       </div>
-      <button id="resetBoundariesBtn" type="button" class="secondary" style="margin-top:10px;">Reset to
-        Defaults</button>
+      <div class="card-content">
+        <p class="lead">Customize the percentage thresholds for each grade classification.</p>
+        <div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px;">
+          <div>
+            <label for="boundary1st">1st Class (%)</label>
+            <input type="number" id="boundary1st" min="0" max="100" value="70" step="1">
+          </div>
+          <div>
+            <label for="boundary21">2.1 Upper Class (%)</label>
+            <input type="number" id="boundary21" min="0" max="100" value="60" step="1">
+          </div>
+          <div>
+            <label for="boundary22">2.2 Lower Class (%)</label>
+            <input type="number" id="boundary22" min="0" max="100" value="50" step="1">
+          </div>
+          <div>
+            <label for="boundary3rd">3rd Class (%)</label>
+            <input type="number" id="boundary3rd" min="0" max="100" value="40" step="1">
+          </div>
+          <div>
+            <label for="boundaryFail">Marginal Fail (%)</label>
+            <input type="number" id="boundaryFail" min="0" max="100" value="30" step="1">
+          </div>
+        </div>
+        <button id="resetBoundariesBtn" type="button" class="secondary" style="margin-top:10px;">Reset to Defaults</button>
+      </div>
     </div>
 
+    <!-- Assessments -->
     <div class="card">
-      <h2>Assessments</h2>
-      <p class="lead">Enter completed marks and weightings. Leave score empty for incomplete assessments. Total weight
-        must equal 100%.</p>
-      <table id="marksTable">
-        <thead>
-          <tr>
-            <th>Assessment</th>
-            <th>Score</th>
-            <th>Max Score</th>
-            <th>Weight (%)</th>
-            <th>Contribution</th>
-            <th></th>
-          </tr>
-        </thead>
-        <tbody id="marksBody"></tbody>
-        <tfoot>
-          <tr>
-            <td><strong>Total</strong></td>
-            <td>-</td>
-            <td>-</td>
-            <td id="totalWeight">-</td>
-            <td id="totalWeightedScore">-</td>
-            <td id="predictedGrade">-</td>
-          </tr>
-        </tfoot>
-      </table>
-      <div class="buttons">
-        <button id="addRowBtn" type="button">Add Assessment</button>
-        <button id="calculateTargetBtn" type="button">Calculate Target Outcomes</button>
-        <button id="clearBtn" type="button" class="secondary">Clear All</button>
+      <div class="card-header">
+        <h2>Assessments</h2>
+        <span class="toggle-icon">&#9650;</span>
+      </div>
+      <div class="card-content">
+        <p class="lead">Enter completed marks and weightings. Leave score empty for incomplete assessments. Total weight must equal 100%.</p>
+        <table id="marksTable">
+          <thead>
+            <tr>
+              <th>Assessment</th>
+              <th>Score</th>
+              <th>Max Score</th>
+              <th>Weight (%)</th>
+              <th>Contribution</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody id="marksBody"></tbody>
+          <tfoot>
+            <tr>
+              <td><strong>Total</strong></td>
+              <td>-</td>
+              <td>-</td>
+              <td id="totalWeight">-</td>
+              <td id="totalWeightedScore">-</td>
+              <td id="predictedGrade">-</td>
+            </tr>
+          </tfoot>
+        </table>
+        <div class="buttons">
+          <button id="addRowBtn" type="button">Add Assessment</button>
+          <button id="calculateTargetBtn" type="button">Calculate Target Outcomes</button>
+          <button id="clearBtn" type="button" class="secondary">Clear All</button>
+        </div>
       </div>
     </div>
+
   </div>
-
-
 </body>
 
 </html>
-
