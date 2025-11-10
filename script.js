@@ -1,23 +1,35 @@
-
 document.addEventListener('DOMContentLoaded', function () {
-    const marksBody = document.getElementById('marksBody');
-    const addRowBtn = document.getElementById('addRowBtn');
-    const targetInput = document.getElementById('target');
-    const targetOutput = document.getElementById('targetOutput');
-    const totalWeightCell = document.getElementById('totalWeight');
-    const totalWeightedScoreCell = document.getElementById('totalWeightedScore');
-    const predictedGradeCell = document.getElementById('predictedGrade');
-    const clearBtn = document.getElementById('clearBtn');
-    const calculateTargetBtn = document.getElementById('calculateTargetBtn');
+    // ============================================================================
+    // DOM ELEMENTS
+    // ============================================================================
+    const elements = {
+        marksBody: document.getElementById('marksBody'),
+        addRowBtn: document.getElementById('addRowBtn'),
+        addRowError: document.getElementById('addRowError'),
+        targetInput: document.getElementById('target'),
+        targetOutput: document.getElementById('targetOutput'),
+        totalWeightCell: document.getElementById('totalWeight'),
+        totalWeightedScoreCell: document.getElementById('totalWeightedScore'),
+        predictedGradeCell: document.getElementById('predictedGrade'),
+        clearBtn: document.getElementById('clearBtn'),
+        calculateTargetBtn: document.getElementById('calculateTargetBtn'),
+        boundaries: {
+            first: document.getElementById('boundary1st'),
+            upperSecond: document.getElementById('boundary21'),
+            lowerSecond: document.getElementById('boundary22'),
+            third: document.getElementById('boundary3rd'),
+            fail: document.getElementById('boundaryFail')
+        },
+        resetBoundariesBtn: document.getElementById('resetBoundariesBtn'),
+        celebration: document.getElementById('celebration')
+    };
 
-    const boundary1st = document.getElementById('boundary1st');
-    const boundary21 = document.getElementById('boundary21');
-    const boundary22 = document.getElementById('boundary22');
-    const boundary3rd = document.getElementById('boundary3rd');
-    const boundaryFail = document.getElementById('boundaryFail');
-    const resetBoundariesBtn = document.getElementById('resetBoundariesBtn');
+    // ============================================================================
+    // CONSTANTS
+    // ============================================================================
+    const MAX_ASSESSMENTS = 6;
 
-    const defaultBoundaries = {
+    const DEFAULT_BOUNDARIES = {
         '1st': 70,
         '2.1': 60,
         '2.2': 50,
@@ -25,474 +37,585 @@ document.addEventListener('DOMContentLoaded', function () {
         'fail': 30
     };
 
+    const CONFETTI_CONFIG = {
+        count: 300,
+        minSize: 4,
+        maxSize: 12,
+        minDistance: 100,
+        maxDistance: 1100,
+        minDuration: 1.5,
+        maxDuration: 2.5,
+        displayTime: 3000
+    };
+
+    let celebrationActive = false;
+
+    // ============================================================================
+    // ROUNDING MODE
+    // ============================================================================
+    function getRoundingMode() {
+        const selected = document.querySelector('input[name="roundingMode"]:checked');
+        if (!selected) return 'normal';
+        return selected.value;
+    }
+
+    function applyRounding(value) {
+        // Prevent recursion or weird cases (like NaN)
+        if (typeof value !== 'number' || isNaN(value)) return 0;
+
+        const mode = getRoundingMode();
+        console.log("The Value is" + value)
+        switch (mode) {
+            case 'up':
+                return Math.ceil(value);
+            case 'down':
+                return Math.floor(value);
+            default:
+                return Math.round(value);
+        }
+    }
+
+    // ============================================================================
+    // BOUNDARY MANAGEMENT
+    // ============================================================================
     function getGradeDict() {
         return {
-            [parseInt(boundary1st.value)]: '1st Class',
-            [parseInt(boundary21.value)]: '2.1 Upper Class',
-            [parseInt(boundary22.value)]: '2.2 Lower Class',
-            [parseInt(boundary3rd.value)]: '3rd Class',
-            [parseInt(boundaryFail.value)]: 'Marginal Fail',
+            [parseInt(elements.boundaries.first.value)]: '1st Class',
+            [parseInt(elements.boundaries.upperSecond.value)]: '2.1 Upper Class',
+            [parseInt(elements.boundaries.lowerSecond.value)]: '2.2 Lower Class',
+            [parseInt(elements.boundaries.third.value)]: '3rd Class',
+            [parseInt(elements.boundaries.fail.value)]: 'Marginal Fail',
             0: 'Fail'
         };
     }
 
     function updateTargetDropdown() {
-        const currentValue = targetInput.value;
-        targetInput.innerHTML = `
-          <option value="${boundary1st.value}">1st</option>
-          <option value="${boundary21.value}">2.1</option>
-          <option value="${boundary22.value}">2.2</option>
-          <option value="${boundary3rd.value}">3rd</option>
+        const currentValue = elements.targetInput.value;
+        const b = elements.boundaries;
+
+        elements.targetInput.innerHTML = `
+            <option value="${b.first.value}">1st</option>
+            <option value="${b.upperSecond.value}">2.1</option>
+            <option value="${b.lowerSecond.value}">2.2</option>
+            <option value="${b.third.value}">3rd</option>
         `;
 
-        // Try to keep the same selection if it still exists
-        const options = Array.from(targetInput.options);
-        const matchingOption = options.find(opt => opt.value === currentValue);
+        // Restore previous selection if it exists
+        const matchingOption = Array.from(elements.targetInput.options)
+            .find(opt => opt.value === currentValue);
         if (matchingOption) {
-            targetInput.value = currentValue;
+            elements.targetInput.value = currentValue;
         }
     }
 
     function resetBoundaries() {
-        boundary1st.value = defaultBoundaries['1st'];
-        boundary21.value = defaultBoundaries['2.1'];
-        boundary22.value = defaultBoundaries['2.2'];
-        boundary3rd.value = defaultBoundaries['3rd'];
-        boundaryFail.value = defaultBoundaries['fail'];
+        elements.boundaries.first.value = DEFAULT_BOUNDARIES['1st'];
+        elements.boundaries.upperSecond.value = DEFAULT_BOUNDARIES['2.1'];
+        elements.boundaries.lowerSecond.value = DEFAULT_BOUNDARIES['2.2'];
+        elements.boundaries.third.value = DEFAULT_BOUNDARIES['3rd'];
+        elements.boundaries.fail.value = DEFAULT_BOUNDARIES['fail'];
         updateTargetDropdown();
         updateTotals();
     }
 
-    const gradeDict = {
-        70: '1st Class',
-        60: '2.1 Upper Class',
-        50: '2.2 Lower Class',
-        40: '3rd Class',
-        30: 'Marginal Fail',
-        0: 'Fail'
-    };
+    function gradeFromScore(score) {
+        const gradeDict = getGradeDict();
+        const thresholds = Object.keys(gradeDict).map(Number).sort((a, b) => b - a);
+        return thresholds.find(t => score >= t) ? gradeDict[thresholds.find(t => score >= t)] : 'N/A';
+    }
+
+    // ============================================================================
+    // VALIDATION UTILITIES
+    // ============================================================================
+    function isValidInteger(value, min = -Infinity, max = Infinity) {
+        const num = parseFloat(value);
+        return !isNaN(num) && Number.isInteger(num) && num >= min && num <= max;
+    }
+
+    function validateInput(input, errorElement, validationFn, errorClass = 'invalid') {
+        const isValid = validationFn();
+        errorElement.style.display = isValid ? 'none' : 'block';
+        input.classList.toggle(errorClass, !isValid);
+        return isValid;
+    }
+
+    // ============================================================================
+    // ROW MANAGEMENT
+    // ============================================================================
+    function createRowHTML(rowIndex, score = '', maxScore = 100, weight = '') {
+        return `
+            <td>Assessment ${rowIndex}</td>
+            <td>
+                <input type="number" step="1" min="0" placeholder="Leave empty if not completed" value="${score}">
+                <span class="error">Score must be between 0 and max score</span>
+            </td>
+            <td>
+                <input type="number" step="1" min="1" value="${maxScore}">
+                <span class="error">Max score must be positive</span>
+            </td>
+            <td>
+                <input type="number" step="1" min="0" max="100" placeholder="0" value="${weight}">
+                <span class="error">Weight must be between 0 and 100</span>
+            </td>
+            <td class="weighted">-</td>
+            <td><button type="button" class="secondary removeBtn">✕</button></td>
+        `;
+    }
+
+    function getRowInputs(row) {
+        return {
+            score: row.children[1].querySelector('input'),
+            maxScore: row.children[2].querySelector('input'),
+            weight: row.children[3].querySelector('input'),
+            weightedCell: row.children[4],
+            errors: {
+                score: row.children[1].querySelector('.error'),
+                maxScore: row.children[2].querySelector('.error'),
+                weight: row.children[3].querySelector('.error')
+            }
+        };
+    }
+
+    function validateRowInputs(inputs) {
+        const scoreVal = parseFloat(inputs.score.value);
+        const maxVal = parseFloat(inputs.maxScore.value);
+        const weightVal = parseFloat(inputs.weight.value) || 0;
+
+        const validations = {
+            maxScore: validateInput(
+                inputs.maxScore,
+                inputs.errors.maxScore,
+                () => isValidInteger(inputs.maxScore.value, 1)
+            ),
+            weight: validateInput(
+                inputs.weight,
+                inputs.errors.weight,
+                () => inputs.weight.value === '' || isValidInteger(weightVal, 0, 100)
+            ),
+            score: validateInput(
+                inputs.score,
+                inputs.errors.score,
+                () => inputs.score.value === '' ||
+                    (isValidInteger(scoreVal, 0, maxVal) && scoreVal <= maxVal)
+            )
+        };
+
+        return {
+            allValid: Object.values(validations).every(v => v),
+            scoreVal,
+            maxVal,
+            weightVal
+        };
+    }
+
+    function calculateWeightedScore(validation, inputs) {
+        const { allValid, scoreVal, maxVal, weightVal } = validation;
+
+        if (inputs.score.value !== '' && allValid && scoreVal >= 0) {
+            const percentScore = (scoreVal / maxVal) * 100;
+            const weightedScore = (percentScore * weightVal) / 100;
+            inputs.weightedCell.textContent = applyRounding(weightedScore) + '%';
+        } else {
+            inputs.weightedCell.textContent = '-';
+        }
+    }
 
     function addRow(score = '', maxScore = 100, weight = '') {
-        const tr = document.createElement('tr');
-        const rowIndex = marksBody.children.length + 1;
-        tr.innerHTML = `
-          <td>Assessment ${rowIndex}</td>
-          <td>
-              <input type="number" step="1" min="0" placeholder="Leave empty if not completed" value="${score}">
-              <span class="error">Score must be between 0 and max score</span>
-          </td>
-          <td>
-              <input type="number" step="1" min="1" value="${maxScore}">
-              <span class="error">Max score must be positive</span>
-          </td>
-          <td>
-            <input type="number" step="1" min="0" max="100" placeholder="0" value="${weight}">
-            <span class="error">Weight must be between 0 and 100</span>
-          </td>
-          <td class="weighted">-</td>
-          <td><button type="button" class="secondary removeBtn">✕</button></td>
-        `;
-        marksBody.appendChild(tr);
+        // Check max assessments limit
+        if (elements.marksBody.children.length >= MAX_ASSESSMENTS) {
+            return;
+        }
 
-        const scoreInput = tr.children[1].querySelector('input');
-        const maxScoreInput = tr.children[2].querySelector('input');
-        const weightInput = tr.children[3].querySelector('input');
-        const weightedCell = tr.children[4];
-        const errorSpan = tr.children[3].querySelector('.error');
-        const errorScore = tr.children[1].querySelector('.error');
-        const errorMax = tr.children[2].querySelector('.error');
+        const tr = document.createElement('tr');
+        const rowIndex = elements.marksBody.children.length + 1;
+        tr.innerHTML = createRowHTML(rowIndex, score, maxScore, weight);
+        elements.marksBody.appendChild(tr);
+
+        const inputs = getRowInputs(tr);
 
         function autoUpdate() {
-            const scoreVal = parseFloat(scoreInput.value);
-            const maxVal = parseFloat(maxScoreInput.value);
-            const weightVal = parseFloat(weightInput.value) || 0;
-
-            // Validate max score
-            let maxValid = true;
-            if (maxVal < 1 || isNaN(maxVal) || !Number.isInteger(maxVal)) {
-                errorMax.style.display = 'block';
-                maxScoreInput.classList.add('invalid');
-                maxValid = false;
-            } else {
-                errorMax.style.display = 'none';
-                maxScoreInput.classList.remove('invalid');
-            }
-
-            // Validate weight
-            let weightValid = true;
-            if (weightVal > 100 || weightVal < 0 || (weightInput.value !== '' && !Number.isInteger(weightVal))) {
-                errorSpan.style.display = 'block';
-                weightInput.classList.add('invalid');
-                weightValid = false;
-            } else {
-                errorSpan.style.display = 'none';
-                weightInput.classList.remove('invalid');
-            }
-
-            // Validate score
-            let scoreValid = true;
-            if (scoreInput.value !== '') {
-                if (scoreVal < 0 || scoreVal > maxVal || !Number.isInteger(scoreVal)) {
-                    errorScore.style.display = 'block';
-                    scoreInput.classList.add('invalid');
-                    scoreValid = false;
-                } else {
-                    errorScore.style.display = 'none';
-                    scoreInput.classList.remove('invalid');
-                }
-            } else {
-                errorScore.style.display = 'none';
-                scoreInput.classList.remove('invalid');
-            }
-
-            // Calculate weighted score
-            if (scoreInput.value !== '' && !isNaN(scoreVal) && !isNaN(maxVal) && maxVal >= 1 && weightValid && scoreValid && maxValid && scoreVal >= 0) {
-                const percentScore = (scoreVal / maxVal) * 100;
-                const weightedScore = (percentScore * weightVal) / 100;
-                weightedCell.textContent = Math.round(weightedScore) + '%';
-            } else {
-                weightedCell.textContent = '-';
-            }
-
+            const validation = validateRowInputs(inputs);
+            calculateWeightedScore(validation, inputs);
             updateTotals();
         }
 
-        scoreInput.addEventListener('input', autoUpdate);
-        maxScoreInput.addEventListener('input', autoUpdate);
-        weightInput.addEventListener('input', autoUpdate);
+        // Attach event listeners
+        [inputs.score, inputs.maxScore, inputs.weight].forEach(input => {
+            input.addEventListener('input', autoUpdate);
+        });
 
         tr.querySelector('.removeBtn').onclick = () => {
             tr.remove();
-            Array.from(marksBody.children).forEach((r, i) => {
-                r.children[0].textContent = `Assessment ${i + 1}`;
-            });
+            renumberRows();
             updateTotals();
         };
 
         autoUpdate();
     }
 
-    function updateTotals() {
+    function renumberRows() {
+        Array.from(elements.marksBody.children).forEach((row, i) => {
+            row.children[0].textContent = `Assessment ${i + 1}`;
+        });
+    }
+
+    // ============================================================================
+    // CALCULATIONS
+    // ============================================================================
+    function getRowData(row) {
+        const inputs = getRowInputs(row);
+        return {
+            scoreVal: parseFloat(inputs.score.value),
+            maxVal: parseFloat(inputs.maxScore.value),
+            weightVal: parseFloat(inputs.weight.value) || 0,
+            scoreInput: inputs.score.value,
+            hasErrors: !validateRowInputs(inputs).allValid
+        };
+    }
+
+    function calculateTotals() {
         let totalWeight = 0;
         let totalWeightedScore = 0;
         let hasErrors = false;
 
-        const rows = marksBody.querySelectorAll('tr');
-        rows.forEach(r => {
-            const sInput = r.children[1].querySelector('input');
-            const sVal = parseFloat(sInput.value);
-            const mInput = r.children[2].querySelector('input');
-            const mVal = parseFloat(mInput.value);
-            const wInput = r.children[3].querySelector('input');
-            const wVal = parseFloat(wInput.value) || 0;
+        Array.from(elements.marksBody.querySelectorAll('tr')).forEach(row => {
+            const data = getRowData(row);
 
-            // Check for any errors
-            if (wVal > 100 || wVal < 0 || mVal < 1 || isNaN(mVal)) {
-                hasErrors = true;
-            }
-            if (wInput.value !== '' && !Number.isInteger(wVal)) {
-                hasErrors = true;
-            }
-            if (mInput.value !== '' && !Number.isInteger(mVal)) {
-                hasErrors = true;
-            }
-            if (sInput.value !== '' && (sVal < 0 || sVal > mVal || !Number.isInteger(sVal))) {
-                hasErrors = true;
-            }
+            if (data.hasErrors) hasErrors = true;
+            if (data.weightVal >= 0 && data.weightVal <= 100) totalWeight += data.weightVal;
 
-            if (!isNaN(wVal) && wVal <= 100 && wVal >= 0) totalWeight += wVal;
-            if (sInput.value !== '' && !isNaN(sVal) && sVal >= 0 && !isNaN(mVal) && mVal >= 1 && wVal <= 100 && wVal >= 0 && sVal <= mVal) {
-                totalWeightedScore += (sVal / mVal * 100 * wVal / 100);
+            if (data.scoreInput !== '' && !data.hasErrors && data.scoreVal >= 0 && data.scoreVal <= data.maxVal) {
+                totalWeightedScore += (data.scoreVal / data.maxVal * 100 * data.weightVal / 100);
             }
         });
 
-        totalWeightCell.textContent = Math.round(totalWeight) + '%';
-        totalWeightCell.style.color = Math.abs(totalWeight - 100) < 0.01 ? 'inherit' : '#fbbf24';
-
-        totalWeightedScoreCell.textContent = Math.round(totalWeightedScore) + '%';
-        predictedGradeCell.textContent = gradeFromScore(totalWeightedScore);
-
-        // Disable calculate button if there are errors
-        calculateTargetBtn.disabled = hasErrors;
-
-        toggleAddButton();
-        toggleCalculateButton();
+        return { totalWeight, totalWeightedScore, hasErrors };
     }
 
-    function gradeFromScore(score) {
-        const currentGradeDict = getGradeDict();
-        const thresholds = Object.keys(currentGradeDict).map(Number).sort((a, b) => b - a);
-        for (let t of thresholds) {
-            if (score >= t) return currentGradeDict[t];
+    function updateTotals() {
+        const { totalWeight, totalWeightedScore, hasErrors } = calculateTotals();
+
+        elements.totalWeightCell.textContent = applyRounding(totalWeight) + '%';
+        elements.totalWeightCell.style.color = Math.abs(totalWeight - 100) < 0.01 ? 'inherit' : '#fbbf24';
+
+        elements.totalWeightedScoreCell.textContent = applyRounding(totalWeightedScore) + '%';
+        elements.predictedGradeCell.textContent = gradeFromScore(totalWeightedScore);
+
+        elements.calculateTargetBtn.disabled = hasErrors || Math.abs(totalWeight - 100) > 0.01;
+        updateAddButtonState(totalWeight);
+    }
+
+    function updateAddButtonState(totalWeight) {
+        const rowCount = elements.marksBody.children.length;
+        const isAtMaxRows = rowCount >= MAX_ASSESSMENTS;
+        const isAtMaxWeight = totalWeight >= 100;
+
+        elements.addRowBtn.disabled = isAtMaxRows || isAtMaxWeight;
+
+        // Show/hide error message
+        if (!elements.addRowError) {
+            // Create error element if it doesn't exist
+            const errorSpan = document.createElement('span');
+            errorSpan.id = 'addRowError';
+            errorSpan.className = 'error';
+            errorSpan.style.display = 'none';
+            elements.addRowBtn.parentNode.appendChild(errorSpan);
+            elements.addRowError = errorSpan;
         }
-        return 'N/A';
+
+        if (isAtMaxRows) {
+            elements.addRowError.textContent = `Cannot add more than ${MAX_ASSESSMENTS} assessments`;
+            elements.addRowError.style.display = 'block';
+        } else if (isAtMaxWeight) {
+            elements.addRowError.textContent = 'Cannot add more (100% weight reached)';
+            elements.addRowError.style.display = 'block';
+        } else {
+            elements.addRowError.style.display = 'none';
+        }
     }
 
-    function updateTargetPrediction() {
+    // ============================================================================
+    // TARGET PREDICTION
+    // ============================================================================
+    function getAssessmentData() {
         let totalWeightedScore = 0;
         let totalCompletedWeight = 0;
         const remainingAssessments = [];
 
-        const rows = marksBody.querySelectorAll('tr');
-        rows.forEach((r, i) => {
-            const scoreInput = r.children[1].querySelector('input');
-            const scoreVal = scoreInput.value;
-            const maxScore = parseFloat(r.children[2].querySelector('input').value);
-            const weight = parseFloat(r.children[3].querySelector('input').value) || 0;
+        Array.from(elements.marksBody.querySelectorAll('tr')).forEach((row, i) => {
+            const data = getRowData(row);
 
-            if (scoreVal === '' || scoreVal === null) {
-                if (weight > 0) {
-                    remainingAssessments.push({ index: i + 1, weight, maxScore });
+            if (data.scoreInput === '' || data.scoreInput === null) {
+                if (data.weightVal > 0) {
+                    remainingAssessments.push({
+                        index: i + 1,
+                        weight: data.weightVal,
+                        maxScore: data.maxVal
+                    });
                 }
-            } else {
-                const sVal = parseFloat(scoreVal);
-                if (!isNaN(sVal) && !isNaN(maxScore) && maxScore > 0 && sVal <= maxScore) {
-                    totalWeightedScore += (sVal / maxScore * 100 * weight / 100);
-                    totalCompletedWeight += weight;
-                }
+            } else if (!data.hasErrors && data.scoreVal <= data.maxVal) {
+                totalWeightedScore += (data.scoreVal / data.maxVal * 100 * data.weightVal / 100);
+                totalCompletedWeight += data.weightVal;
             }
         });
 
-        const targetGradePercent = parseFloat(targetInput.value);
+        return { totalWeightedScore, totalCompletedWeight, remainingAssessments };
+    }
+
+    function displayTargetResult(className, content, shouldCelebrate = false) {
+        elements.targetOutput.className = `result ${className}`.trim();
+        elements.targetOutput.innerHTML = content;
+        elements.targetOutput.style.display = 'block';
+
+        if (shouldCelebrate) triggerCelebration();
+
+        setTimeout(() => {
+            elements.targetOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        }, 50);
+    }
+
+    function generateTargetScenarios(remainingAssessments, pointsNeeded, targetGradePercent, gradeName) {
+        if (remainingAssessments.length === 1) {
+            return generateSingleAssessmentScenario(remainingAssessments[0], pointsNeeded);
+        }
+        return generateMultipleAssessmentScenarios(remainingAssessments, pointsNeeded);
+    }
+
+    function generateSingleAssessmentScenario(assessment, pointsNeeded) {
+        const avgPercentNeeded = (pointsNeeded / assessment.weight) * 100;
+        const scoreNeeded = applyRounding((avgPercentNeeded * assessment.maxScore / 100));
+
+        const detail = avgPercentNeeded > 100
+            ? `Target cannot be achieved (would need ${scoreNeeded}/${assessment.maxScore})`
+            : `You need to score ${scoreNeeded} out of ${assessment.maxScore}`;
+
+        return `<div class="option-box"><div class="option-title">Assessment ${assessment.index}:</div><div class="option-detail">${detail}</div></div>`;
+    }
+
+    function generateMultipleAssessmentScenarios(remainingAssessments, pointsNeeded) {
+        let html = '<div style="margin:12px 0;font-weight:600;">Choose ONE of these options:</div>';
+
+        // Generate scenarios for each assessment at 100%
+        remainingAssessments.forEach((targetAssessment, targetIdx) => {
+            html += generateScenarioOption(targetIdx + 1, targetAssessment, remainingAssessments, pointsNeeded);
+        });
+
+        // Add equal distribution scenario
+        html += generateEqualDistributionScenario(remainingAssessments, pointsNeeded);
+
+        return html;
+    }
+
+    function generateScenarioOption(optionNum, targetAssessment, allAssessments, pointsNeeded) {
+        const remainingPoints = pointsNeeded - targetAssessment.weight;
+
+        if (remainingPoints <= 0) {
+            return `<div class="option-box"><div class="option-title">Option ${optionNum}:</div><div class="option-detail">Score 100% (${targetAssessment.maxScore}/${targetAssessment.maxScore}) on Assessment ${targetAssessment.index}</div></div>`;
+        }
+
+        const otherAssessments = allAssessments.filter(a => a.index !== targetAssessment.index);
+        const otherTotalWeight = otherAssessments.reduce((sum, a) => sum + a.weight, 0);
+
+        if (otherTotalWeight === 0) {
+            return `<div class="option-box"><div class="option-title">Option ${optionNum}:</div><div class="option-detail">Cannot achieve target even with 100% on Assessment ${targetAssessment.index}</div></div>`;
+        }
+
+        const avgNeededOthers = (remainingPoints / otherTotalWeight) * 100;
+
+        if (avgNeededOthers > 100) {
+            return `<div class="option-box"><div class="option-title">Option ${optionNum}:</div><div class="option-detail">Score 100% on Assessment ${targetAssessment.index}, but still cannot achieve target</div></div>`;
+        }
+
+        let content = `<div class="option-detail">Score 100% (${targetAssessment.maxScore}/${targetAssessment.maxScore}) on Assessment ${targetAssessment.index}</div>`;
+        otherAssessments.forEach(a => {
+            const scoreNeeded = applyRounding((avgNeededOthers * a.maxScore / 100));
+            content += `<div class="option-detail">AND ${scoreNeeded}/${a.maxScore} on Assessment ${a.index}</div>`;
+        });
+
+        return `<div class="option-box"><div class="option-title">Option ${optionNum}:</div>${content}</div>`;
+    }
+
+    function generateEqualDistributionScenario(remainingAssessments, pointsNeeded) {
+        const totalWeight = remainingAssessments.reduce((sum, a) => sum + a.weight, 0);
+        const avgPercentNeeded = (pointsNeeded / totalWeight) * 100;
+
+        let content = '<div class="option-detail">Score equally across all assessments:</div>';
+        remainingAssessments.forEach(a => {
+            const scoreNeeded = applyRounding((avgPercentNeeded * a.maxScore / 100));
+            const status = avgPercentNeeded > 100 ? ' (impossible)' : '';
+            content += `<div class="option-detail">Assessment ${a.index}: ${scoreNeeded}/${a.maxScore}${status}</div>`;
+        });
+
+        return `<div class="option-box"><div class="option-title">Option (Equal Distribution):</div>${content}</div>`;
+    }
+
+    function updateTargetPrediction() {
+        const { totalWeightedScore, totalCompletedWeight, remainingAssessments } = getAssessmentData();
+        const targetGradePercent = parseFloat(elements.targetInput.value);
         const totalRemainingWeight = remainingAssessments.reduce((sum, a) => sum + a.weight, 0);
         const totalWeight = totalCompletedWeight + totalRemainingWeight;
+        const gradeName = gradeFromScore(targetGradePercent);
 
+        // Check total weight
         if (Math.abs(totalWeight - 100) > 0.01) {
-            targetOutput.className = 'result warning';
-            targetOutput.textContent = `⚠️ Total weight is ${Math.round(totalWeight)}% (should be 100%). Adjust weights before calculating target.`;
-            targetOutput.style.display = 'block';
+            displayTargetResult('warning',
+                `⚠️ Total weight is ${applyRounding(totalWeight)}% (should be 100%). Adjust weights before calculating target.`);
             return;
         }
 
         const maxPossibleScore = totalWeightedScore + totalRemainingWeight;
-        const gradeName = gradeFromScore(targetGradePercent);
 
-        // Check if target is impossible (even with 100% on remaining assessments)
+        // Check if target is impossible
         if (targetGradePercent > maxPossibleScore) {
-            targetOutput.className = 'result warning';
-            targetOutput.textContent = `❌ Target of ${gradeName} (${targetGradePercent}%) cannot be achieved.\nMaximum possible: ${Math.round(maxPossibleScore)}% (${gradeFromScore(maxPossibleScore)})`;
-            targetOutput.style.display = 'block';
+            displayTargetResult('warning',
+                `❌ Target of ${gradeName} (${targetGradePercent}%) cannot be achieved.\nMaximum possible: ${applyRounding(maxPossibleScore)}% (${gradeFromScore(maxPossibleScore)})`);
             return;
         }
 
-        // Also show target prediction even with no remaining assessments
+        // Handle no remaining assessments
         if (remainingAssessments.length === 0) {
             if (totalWeightedScore < targetGradePercent) {
-                targetOutput.className = 'result warning';
-                targetOutput.textContent = `❌ Target of ${gradeName} (${targetGradePercent}%) cannot be achieved.\nCurrent score: ${Math.round(totalWeightedScore)}% (${gradeFromScore(totalWeightedScore)})\nNo remaining assessments to improve.`;
-                targetOutput.style.display = 'block';
+                displayTargetResult('warning',
+                    `❌ Target of ${gradeName} (${targetGradePercent}%) cannot be achieved.\nCurrent score: ${applyRounding(totalWeightedScore)}% (${gradeFromScore(totalWeightedScore)})\nNo remaining assessments to improve.`);
             } else {
-                targetOutput.className = 'result';
-                targetOutput.textContent = `✓ Target of ${gradeName} already met with ${Math.round(totalWeightedScore)}%!`;
-                targetOutput.style.display = 'block';
-                triggerCelebration();
+                displayTargetResult('',
+                    `✓ Target of ${gradeName} already met with ${applyRounding(totalWeightedScore)}%!`, true);
             }
             return;
         }
 
+        // Target already achieved
         if (totalWeightedScore >= targetGradePercent) {
-            targetOutput.className = 'result';
-            targetOutput.textContent = `✓ Target of ${gradeName} already achieved with ${Math.round(totalWeightedScore)}%!`;
-            targetOutput.style.display = 'block';
+            displayTargetResult('',
+                `✓ Target of ${gradeName} already achieved with ${applyRounding(totalWeightedScore)}% congratulations!!!🥳`);
             return;
         }
 
-        // Calculate what's needed across remaining assessments
+        // Calculate scenarios
         const pointsNeeded = targetGradePercent - totalWeightedScore;
-        const avgPercentNeeded = (pointsNeeded / totalRemainingWeight) * 100;
+        const scenariosHTML = `
+            <div style="margin-bottom:12px;">To achieve <strong>${gradeName}</strong> (${targetGradePercent}%), you need <strong>${applyRounding(pointsNeeded)}</strong> more percentage points.</div>
+            ${generateTargetScenarios(remainingAssessments, pointsNeeded, targetGradePercent, gradeName)}
+        `;
 
-        let messagesHTML = `<div style="margin-bottom:12px;">To achieve <strong>${gradeName}</strong> (${targetGradePercent}%), you need <strong>${Math.round(pointsNeeded)}</strong> more percentage points.</div>`;
-
-        if (remainingAssessments.length === 1) {
-            const a = remainingAssessments[0];
-            const scoreNeeded = Math.round((avgPercentNeeded * a.maxScore / 100));
-            if (avgPercentNeeded > 100) {
-                messagesHTML += `<div class="option-box"><div class="option-title">Assessment ${a.index}:</div><div class="option-detail">Target cannot be achieved (would need ${scoreNeeded}/${a.maxScore})</div></div>`;
-            } else {
-                messagesHTML += `<div class="option-box"><div class="option-title">Assessment ${a.index}:</div><div class="option-detail">You need to score ${scoreNeeded} out of ${a.maxScore}</div></div>`;
-            }
-        } else {
-            messagesHTML += `<div style="margin:12px 0;font-weight:600;">Choose ONE of these options:</div>`;
-
-            // Generate different scenarios
-            remainingAssessments.forEach((targetAssessment, targetIdx) => {
-                const maxContribution = targetAssessment.weight;
-                const remainingPoints = pointsNeeded - maxContribution;
-
-                if (remainingPoints <= 0) {
-                    messagesHTML += `<div class="option-box"><div class="option-title">Option ${targetIdx + 1}:</div><div class="option-detail">Score 100% (${targetAssessment.maxScore}/${targetAssessment.maxScore}) on Assessment ${targetAssessment.index}</div></div>`;
-                } else {
-                    const otherAssessments = remainingAssessments.filter((_, idx) => idx !== targetIdx);
-                    const otherTotalWeight = otherAssessments.reduce((sum, a) => sum + a.weight, 0);
-
-                    if (otherTotalWeight === 0) {
-                        messagesHTML += `<div class="option-box"><div class="option-title">Option ${targetIdx + 1}:</div><div class="option-detail">Cannot achieve target even with 100% on Assessment ${targetAssessment.index}</div></div>`;
-                    } else {
-                        const avgNeededOthers = (remainingPoints / otherTotalWeight) * 100;
-
-                        if (avgNeededOthers > 100) {
-                            messagesHTML += `<div class="option-box"><div class="option-title">Option ${targetIdx + 1}:</div><div class="option-detail">Score 100% on Assessment ${targetAssessment.index}, but still cannot achieve target</div></div>`;
-                        } else {
-                            let optionContent = `<div class="option-detail">Score 100% (${targetAssessment.maxScore}/${targetAssessment.maxScore}) on Assessment ${targetAssessment.index}</div>`;
-                            otherAssessments.forEach(a => {
-                                const scoreNeeded = Math.round((avgNeededOthers * a.maxScore / 100));
-                                optionContent += `<div class="option-detail">AND ${scoreNeeded}/${a.maxScore} on Assessment ${a.index}</div>`;
-                            });
-                            messagesHTML += `<div class="option-box"><div class="option-title">Option ${targetIdx + 1}:</div>${optionContent}</div>`;
-                        }
-                    }
-                }
-            });
-
-            // Add the "equal distribution" scenario
-            let equalContent = '';
-            remainingAssessments.forEach(a => {
-                const scoreNeeded = Math.round((avgPercentNeeded * a.maxScore / 100));
-                if (avgPercentNeeded > 100) {
-                    equalContent += `<div class="option-detail">Assessment ${a.index}: Would need ${scoreNeeded}/${a.maxScore} (impossible)</div>`;
-                } else {
-                    equalContent += `<div class="option-detail">Assessment ${a.index}: ${scoreNeeded}/${a.maxScore}</div>`;
-                }
-            });
-            messagesHTML += `<div class="option-box"><div class="option-title">Option (Equal Distribution):</div><div class="option-detail">Score equally across all assessments:</div>${equalContent}</div>`;
-        }
-
-        targetOutput.className = 'result';
-        targetOutput.innerHTML = messagesHTML;
-        targetOutput.style.display = 'block';
+        displayTargetResult('', scenariosHTML);
     }
 
-    function toggleAddButton() {
-        const totalWeight = Array.from(marksBody.querySelectorAll('tr')).reduce((sum, row) => {
-            const weightVal = parseFloat(row.children[3].querySelector('input').value) || 0;
-            return sum + (weightVal <= 100 ? weightVal : 0);
-        }, 0);
-        addRowBtn.disabled = totalWeight >= 100;
-    }
-
-    function toggleCalculateButton() {
-        const totalWeight = Array.from(marksBody.querySelectorAll('tr')).reduce((sum, row) => {
-            const weightVal = parseFloat(row.children[3].querySelector('input').value) || 0;
-            return sum + weightVal;
-        }, 0);
-
-        // Enable only if total weight is exactly 100
-        calculateTargetBtn.disabled = Math.abs(totalWeight - 100) > 0.01;
-    }
-
-
-    function clear() {
-        marksBody.innerHTML = '';
-        totalWeightCell.textContent = '-';
-        totalWeightedScoreCell.textContent = '-';
-        predictedGradeCell.textContent = '-';
-        targetOutput.style.display = 'none';
-        addRowBtn.disabled = false;
-        addRow();
-    }
-
-    targetInput.addEventListener('change', () => {
-        targetOutput.style.display = 'none';
-    });
-
-    // Update calculations when boundaries change
-    boundary1st.addEventListener('input', () => { updateTargetDropdown(); updateTotals(); });
-    boundary21.addEventListener('input', () => { updateTargetDropdown(); updateTotals(); });
-    boundary22.addEventListener('input', () => { updateTargetDropdown(); updateTotals(); });
-    boundary3rd.addEventListener('input', () => { updateTargetDropdown(); updateTotals(); });
-    boundaryFail.addEventListener('input', updateTotals);
-
-    resetBoundariesBtn.addEventListener('click', resetBoundaries);
-
-    calculateTargetBtn.addEventListener('click', () => {
-        updateTargetPrediction(); // calculate target and show output
-
-        // Only scroll if targetOutput is visible
-        if (targetOutput.style.display !== 'none') {
-            // Use setTimeout to ensure browser has rendered the now-visible element
-            setTimeout(() => {
-                targetOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
-            }, 50);
-        }
-    });
-
-    addRowBtn.addEventListener('click', () => addRow());
-    clearBtn.addEventListener('click', clear);
-
-    // Collapsible card functionality
-    document.querySelectorAll('.card').forEach(card => {
-        const header = card.querySelector('.card-header');
-        const content = card.querySelector('.card-content');
-        const icon = card.querySelector('.toggle-icon');
-
-        // Start expanded by default
-        content.classList.remove('collapsed');
-        icon.classList.remove('collapsed');
-
-        header.addEventListener('click', () => {
-            content.classList.toggle('collapsed');
-            icon.classList.toggle('collapsed');
-        });
-    });
-
-    let celebrationActive = false;
+    // ============================================================================
+    // CELEBRATION ANIMATION
+    // ============================================================================
     function triggerCelebration() {
-
         if (celebrationActive) return;
         celebrationActive = true;
-        const celebration = document.getElementById('celebration');
-        celebration.innerHTML = ''; // clear old confetti
-        celebration.style.display = 'block';
-        celebration.classList.remove('hidden');
 
-        const confettiCount = 300; // number of pieces
+        elements.celebration.innerHTML = '';
+        elements.celebration.style.display = 'block';
+        elements.celebration.classList.remove('hidden');
+
         const centerX = window.innerWidth / 2;
         const centerY = window.innerHeight / 2;
 
-        for (let i = 0; i < confettiCount; i++) {
-            const confetti = document.createElement('div');
-            confetti.classList.add('confetti');
-
-            // random size
-            const size = Math.random() * 8 + 4;
-            confetti.style.width = `${size}px`;
-            confetti.style.height = `${size}px`;
-            confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
-
-            // set initial position to center of screen
-            confetti.style.left = `${centerX}px`;
-            confetti.style.top = `${centerY}px`;
-
-            // random angle and distance
-            const angle = Math.random() * 2 * Math.PI; // 0 to 360 degrees in radians
-            const distance = Math.random() * 1000 + 100; // px
-            const dx = Math.cos(angle) * distance;
-            const dy = Math.sin(angle) * distance;
-
-            // random rotation
-            const rotation = Math.random() * 720 - 360; // -360 to 360 deg
-
-            // random duration
-            const duration = Math.random() * 1 + 1.5; // 1.5 to 2.5 seconds
-
-            // animate using transform
-            confetti.style.transition = `transform ${duration}s ease-out, opacity ${duration}s ease-out`;
-            setTimeout(() => {
-                confetti.style.transform = `translate(${dx}px, ${dy}px) rotate(${rotation}deg)`;
-                confetti.style.opacity = 0;
-            }, 50); // slight delay to ensure transition works
-
-            celebration.appendChild(confetti);
+        for (let i = 0; i < CONFETTI_CONFIG.count; i++) {
+            createConfetti(centerX, centerY);
         }
 
-        // hide container after animation
         setTimeout(() => {
-            celebration.style.display = 'none';
+            elements.celebration.style.display = 'none';
             celebrationActive = false;
-        }, 3000);
+        }, CONFETTI_CONFIG.displayTime);
     }
 
+    function createConfetti(centerX, centerY) {
+        const confetti = document.createElement('div');
+        confetti.classList.add('confetti');
 
-    // Initialize with one empty row
+        const size = Math.random() * (CONFETTI_CONFIG.maxSize - CONFETTI_CONFIG.minSize) + CONFETTI_CONFIG.minSize;
+        confetti.style.width = `${size}px`;
+        confetti.style.height = `${size}px`;
+        confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
+        confetti.style.left = `${centerX}px`;
+        confetti.style.top = `${centerY}px`;
+
+        const angle = Math.random() * 2 * Math.PI;
+        const distance = Math.random() * (CONFETTI_CONFIG.maxDistance - CONFETTI_CONFIG.minDistance) + CONFETTI_CONFIG.minDistance;
+        const dx = Math.cos(angle) * distance;
+        const dy = Math.sin(angle) * distance;
+        const rotation = Math.random() * 720 - 360;
+        const duration = Math.random() * (CONFETTI_CONFIG.maxDuration - CONFETTI_CONFIG.minDuration) + CONFETTI_CONFIG.minDuration;
+
+        confetti.style.transition = `transform ${duration}s ease-out, opacity ${duration}s ease-out`;
+
+        setTimeout(() => {
+            confetti.style.transform = `translate(${dx}px, ${dy}px) rotate(${rotation}deg)`;
+            confetti.style.opacity = 0;
+        }, 50);
+
+        elements.celebration.appendChild(confetti);
+    }
+
+    // ============================================================================
+    // UTILITY FUNCTIONS
+    // ============================================================================
+    function clear() {
+        elements.marksBody.innerHTML = '';
+        elements.totalWeightCell.textContent = '-';
+        elements.totalWeightedScoreCell.textContent = '-';
+        elements.predictedGradeCell.textContent = '-';
+        elements.targetOutput.style.display = 'none';
+        elements.addRowBtn.disabled = false;
+        if (elements.addRowError) {
+            elements.addRowError.style.display = 'none';
+        }
+        addRow();
+    }
+
+    function initializeCollapsibleCards() {
+        document.querySelectorAll('.card').forEach(card => {
+            const header = card.querySelector('.card-header');
+            const content = card.querySelector('.card-content');
+            const icon = card.querySelector('.toggle-icon');
+
+            content.classList.remove('collapsed');
+            icon.classList.remove('collapsed');
+
+            header.addEventListener('click', () => {
+                content.classList.toggle('collapsed');
+                icon.classList.toggle('collapsed');
+            });
+        });
+    }
+
+    // ============================================================================
+    // EVENT LISTENERS
+    // ============================================================================
+    elements.targetInput.addEventListener('change', () => {
+        elements.targetOutput.style.display = 'none';
+    });
+
+    Object.values(elements.boundaries).forEach(boundary => {
+        boundary.addEventListener('input', () => {
+            updateTargetDropdown();
+            updateTotals();
+        });
+    });
+
+    elements.resetBoundariesBtn.addEventListener('click', resetBoundaries);
+    elements.calculateTargetBtn.addEventListener('click', updateTargetPrediction);
+    elements.addRowBtn.addEventListener('click', () => addRow());
+    elements.clearBtn.addEventListener('click', clear);
+
+    // ============================================================================
+    // ROUNDING MODE CHANGE LISTENER
+    // ============================================================================
+    document.querySelectorAll('input[name="roundingMode"]').forEach(radio => {
+        radio.addEventListener('change', () => {
+            updateTotals();
+        });
+    });
+
+    // ============================================================================
+    // INITIALIZATION
+    // ============================================================================
+    initializeCollapsibleCards();
     addRow();
 });
