@@ -285,6 +285,7 @@ document.addEventListener('DOMContentLoaded', function () {
                 targetOutput.className = 'result';
                 targetOutput.textContent = `✓ Target of ${gradeName} already met with ${Math.round(totalWeightedScore)}%!`;
                 targetOutput.style.display = 'block';
+                triggerCelebration();
             }
             return;
         }
@@ -370,14 +371,14 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function toggleCalculateButton() {
-    const totalWeight = Array.from(marksBody.querySelectorAll('tr')).reduce((sum, row) => {
-        const weightVal = parseFloat(row.children[3].querySelector('input').value) || 0;
-        return sum + weightVal;
-    }, 0);
+        const totalWeight = Array.from(marksBody.querySelectorAll('tr')).reduce((sum, row) => {
+            const weightVal = parseFloat(row.children[3].querySelector('input').value) || 0;
+            return sum + weightVal;
+        }, 0);
 
-    // Enable only if total weight is exactly 100
-    calculateTargetBtn.disabled = Math.abs(totalWeight - 100) > 0.01;
-}
+        // Enable only if total weight is exactly 100
+        calculateTargetBtn.disabled = Math.abs(totalWeight - 100) > 0.01;
+    }
 
 
     function clear() {
@@ -403,25 +404,93 @@ document.addEventListener('DOMContentLoaded', function () {
 
     resetBoundariesBtn.addEventListener('click', resetBoundaries);
 
-    calculateTargetBtn.addEventListener('click', updateTargetPrediction);
+    calculateTargetBtn.addEventListener('click', () => {
+        updateTargetPrediction(); // calculate target and show output
+
+        // Only scroll if targetOutput is visible
+        if (targetOutput.style.display !== 'none') {
+            // Use setTimeout to ensure browser has rendered the now-visible element
+            setTimeout(() => {
+                targetOutput.scrollIntoView({ behavior: 'smooth', block: 'start' });
+            }, 50);
+        }
+    });
+
     addRowBtn.addEventListener('click', () => addRow());
     clearBtn.addEventListener('click', clear);
 
     // Collapsible card functionality
     document.querySelectorAll('.card').forEach(card => {
-    const header = card.querySelector('.card-header');
-    const content = card.querySelector('.card-content');
-    const icon = card.querySelector('.toggle-icon');
+        const header = card.querySelector('.card-header');
+        const content = card.querySelector('.card-content');
+        const icon = card.querySelector('.toggle-icon');
 
-    // Start expanded by default
-    content.classList.remove('collapsed');
-    icon.classList.remove('collapsed');
+        // Start expanded by default
+        content.classList.remove('collapsed');
+        icon.classList.remove('collapsed');
 
-    header.addEventListener('click', () => {
-        content.classList.toggle('collapsed');
-        icon.classList.toggle('collapsed');
+        header.addEventListener('click', () => {
+            content.classList.toggle('collapsed');
+            icon.classList.toggle('collapsed');
+        });
     });
-});
+
+    let celebrationActive = false;
+    function triggerCelebration() {
+
+        if (celebrationActive) return;
+        celebrationActive = true;
+        const celebration = document.getElementById('celebration');
+        celebration.innerHTML = ''; // clear old confetti
+        celebration.style.display = 'block';
+        celebration.classList.remove('hidden');
+
+        const confettiCount = 300; // number of pieces
+        const centerX = window.innerWidth / 2;
+        const centerY = window.innerHeight / 2;
+
+        for (let i = 0; i < confettiCount; i++) {
+            const confetti = document.createElement('div');
+            confetti.classList.add('confetti');
+
+            // random size
+            const size = Math.random() * 8 + 4;
+            confetti.style.width = `${size}px`;
+            confetti.style.height = `${size}px`;
+            confetti.style.backgroundColor = `hsl(${Math.random() * 360}, 80%, 60%)`;
+
+            // set initial position to center of screen
+            confetti.style.left = `${centerX}px`;
+            confetti.style.top = `${centerY}px`;
+
+            // random angle and distance
+            const angle = Math.random() * 2 * Math.PI; // 0 to 360 degrees in radians
+            const distance = Math.random() * 1000 + 100; // px
+            const dx = Math.cos(angle) * distance;
+            const dy = Math.sin(angle) * distance;
+
+            // random rotation
+            const rotation = Math.random() * 720 - 360; // -360 to 360 deg
+
+            // random duration
+            const duration = Math.random() * 1 + 1.5; // 1.5 to 2.5 seconds
+
+            // animate using transform
+            confetti.style.transition = `transform ${duration}s ease-out, opacity ${duration}s ease-out`;
+            setTimeout(() => {
+                confetti.style.transform = `translate(${dx}px, ${dy}px) rotate(${rotation}deg)`;
+                confetti.style.opacity = 0;
+            }, 50); // slight delay to ensure transition works
+
+            celebration.appendChild(confetti);
+        }
+
+        // hide container after animation
+        setTimeout(() => {
+            celebration.style.display = 'none';
+            celebrationActive = false;
+        }, 3000);
+    }
 
 
     // Initialize with one empty row
